@@ -1,0 +1,49 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer components {
+  /* Glassmorphism details optimized for Light Theme */
+  .glass-card {
+    @apply bg-white/80 backdrop-blur-md border border-slate-100 shadow-sm rounded-2xl;
+  }
+  
+  .glass-input {
+    @apply bg-white/90 border border-slate-200 focus:border-gov-blue-600 focus:ring-1 focus:ring-gov-blue-600 rounded-xl outline-none transition-all;
+  }
+
+  .btn-primary {
+    @apply bg-gradient-to-r from-gov-blue-700 to-gov-blue-800 hover:from-gov-blue-800 hover:to-gov-blue-900 text-white font-medium px-5 py-2.5 rounded-xl transition-all shadow-sm hover:shadow-md flex items-center justify-center gap-2;
+  }
+
+  .btn-saffron {
+    @apply bg-gradient-to-r from-gov-saffron-600 to-gov-saffron-700 hover:from-gov-saffron-700 hover:to-gov-saffron-800 text-white font-medium px-5 py-2.5 rounded-xl transition-all shadow-sm hover:shadow-md flex items-center justify-center gap-2;
+  }
+
+  .btn-green {
+    @apply bg-gradient-to-r from-gov-green-600 to-gov-green-700 hover:from-gov-green-700 hover:to-gov-green-800 text-white font-medium px-5 py-2.5 rounded-xl transition-all shadow-sm hover:shadow-md flex items-center justify-center gap-2;
+  }
+
+  .btn-outline {
+    @apply border border-slate-200 text-slate-700 hover:bg-slate-50 font-medium px-5 py-2.5 rounded-xl transition-all flex items-center justify-center gap-2;
+  }
+}
+
+/* Custom scrollbars for a clean look */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}

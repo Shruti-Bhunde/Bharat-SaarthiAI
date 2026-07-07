@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 // Base API URL. In production/render, it will use VITE_API_BASE. In development, it defaults to http://localhost:8000
-const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8000';
+const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8000' || 'http://127.0.0.1:8000';
 
 const api = axios.create({
   baseURL: API_BASE,

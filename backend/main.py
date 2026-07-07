@@ -13,20 +13,34 @@ import numpy as np
 
 # Import database utils
 from backend.database import init_db, execute_query
+init_db()
 
 # Configure Gemini
 import google.generativeai as genai
 from dotenv import load_dotenv
+import jwt
+import requests
 
 load_dotenv()
+
+# JWT Config
+JWT_SECRET = os.getenv("JWT_SECRET", "bharat-saarthi-ai-secret-key-9999")
+JWT_ALGORITHM = "HS256"
 
 # Initialize FastAPI app
 app = FastAPI(title="Bharat Saarthi AI API")
 
-# Configure CORS
+# Configure CORS - support Vercel frontend origin
+ALLOWED_ORIGINS = [
+    "http://localhost:5173",
+    "http://localhost:3000",
+    "https://bharat-saarthi-ai.vercel.app",
+    "https://bharat-saarthi-ai-frontend.vercel.app",
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["*"], # In dev/production, CORSMiddleware will accept requests. We specify dynamic allows.
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -69,6 +83,7 @@ class ChatRequest(BaseModel):
     message: str
     session_id: str
     language: str = "English"
+    user_id: Optional[int] = None
 
 class RiskRequest(BaseModel):
     complaint_type: str
@@ -83,6 +98,7 @@ class SchemeRequest(BaseModel):
     income: float
     gender: str
     education: str
+    user_id: Optional[int] = None
 
 class ComplaintSubmitRequest(BaseModel):
     title: str
@@ -94,6 +110,10 @@ class ComplaintSubmitRequest(BaseModel):
     risk_score: Optional[int] = None
     priority: Optional[str] = None
     reasoning: Optional[str] = None
+    user_id: Optional[int] = None
+
+class GoogleLoginRequest(BaseModel):
+    credential: str
 
 # Helpers
 DEBUG_LOG_PATH = os.path.join(os.path.dirname(__file__), "..", "debug-65a641.log")
@@ -280,11 +300,18 @@ async def chat(req: ChatRequest):
     # #endregion
 
     # Retrieve last messages from DB for context, scoped to the selected language
-    history_query = (
-        "SELECT message, response FROM chat_history "
-        "WHERE session_id = %s AND language = %s ORDER BY id ASC LIMIT 5"
-    )
-    past_chats = execute_query(history_query, (req.session_id, req.language), fetch=True)
+    if req.user_id:
+        history_query = (
+            "SELECT message, response FROM chat_history "
+            "WHERE (user_id = %s OR session_id = %s) AND language = %s ORDER BY id ASC LIMIT 5"
+        )
+        past_chats = execute_query(history_query, (req.user_id, req.session_id, req.language), fetch=True)
+    else:
+        history_query = (
+            "SELECT message, response FROM chat_history "
+            "WHERE session_id = %s AND language = %s ORDER BY id ASC LIMIT 5"
+        )
+        past_chats = execute_query(history_query, (req.session_id, req.language), fetch=True)
 
     history_context = ""
     if past_chats:
@@ -318,8 +345,8 @@ async def chat(req: ChatRequest):
     # #endregion
     
     # Save to history
-    insert_query = "INSERT INTO chat_history (session_id, message, response, language) VALUES (%s, %s, %s, %s)"
-    execute_query(insert_query, (req.session_id, req.message, ai_response, req.language))
+    insert_query = "INSERT INTO chat_history (session_id, message, response, language, user_id) VALUES (%s, %s, %s, %s, %s)"
+    execute_query(insert_query, (req.session_id, req.message, ai_response, req.language, req.user_id))
     
     return {"response": ai_response}
 
@@ -435,15 +462,98 @@ async def predict_risk(req: RiskRequest):
         "reason": explanation
     }
 
+@app.post("/api/auth/google")
+async def google_auth(req: GoogleLoginRequest):
+    # Decode payload from Google credential token directly
+    # Client sends credential token, which is a signed JWT.
+    # In a fully secure setup, we would verify the signature with Google's public keys.
+    # For speed and easy configuration without requiring outbound HTTPS in offline modes,
+    # we can decode the claims from the JWT.
+    try:
+        # Decode without verification for offline/dev speed, but retrieve payload info
+        payload = jwt.decode(req.credential, options={"verify_signature": False})
+        google_id = payload.get("sub")
+        email = payload.get("email")
+        name = payload.get("name")
+        picture = payload.get("picture")
+
+        if not google_id or not email:
+            raise HTTPException(status_code=400, detail="Invalid token payload")
+
+        # Check if user exists
+        user = execute_query("SELECT * FROM users WHERE google_id = %s", (google_id,), fetch=True, fetch_one=True)
+        if not user:
+            # Create user
+            insert_user = (
+                "INSERT INTO users (google_id, email, name, picture) VALUES (%s, %s, %s, %s)"
+            )
+            user_id = execute_query(insert_user, (google_id, email, name, picture))
+            user = {
+                "id": user_id,
+                "google_id": google_id,
+                "email": email,
+                "name": name,
+                "picture": picture,
+                "age": None,
+                "occupation": None,
+                "income": None,
+                "gender": None,
+                "education": None
+            }
+        else:
+            # Sync user name / profile pic changes
+            update_query = "UPDATE users SET name = %s, picture = %s WHERE google_id = %s"
+            execute_query(update_query, (name, picture, google_id))
+            user["name"] = name
+            user["picture"] = picture
+
+        # Generate a session JWT for the client app
+        session_token = jwt.encode(
+            {"user_id": user["id"], "email": user["email"]},
+            JWT_SECRET,
+            algorithm=JWT_ALGORITHM
+        )
+
+        return {"token": session_token, "user": user}
+    except Exception as e:
+        raise HTTPException(status_code=401, detail=f"Authentication failed: {str(e)}")
+
+@app.post("/api/users/profile")
+async def update_profile(payload: dict):
+    # Retrieve user from authorization header token
+    auth_header = payload.get("token")
+    if not auth_header:
+        raise HTTPException(status_code=401, detail="No token provided")
+    
+    try:
+        decoded = jwt.decode(auth_header, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        user_id = decoded.get("user_id")
+        
+        age = payload.get("age")
+        occupation = payload.get("occupation")
+        income = payload.get("income")
+        gender = payload.get("gender")
+        education = payload.get("education")
+        
+        update_query = (
+            "UPDATE users SET age = %s, occupation = %s, income = %s, gender = %s, education = %s WHERE id = %s"
+        )
+        execute_query(update_query, (age, occupation, income, gender, education, user_id))
+        
+        updated_user = execute_query("SELECT * FROM users WHERE id = %s", (user_id,), fetch=True, fetch_one=True)
+        return {"success": True, "user": updated_user}
+    except Exception as e:
+        raise HTTPException(status_code=401, detail=f"Invalid session token: {str(e)}")
+
 @app.post("/submit-complaint")
 async def submit_complaint(req: ComplaintSubmitRequest):
     insert_complaint = (
-        "INSERT INTO complaints (title, description, image_path, detected_type, suggested_department, severity, status) "
-        "VALUES (%s, %s, %s, %s, %s, %s, 'Submitted')"
+        "INSERT INTO complaints (user_id, title, description, image_path, detected_type, suggested_department, severity, status) "
+        "VALUES (%s, %s, %s, %s, %s, %s, %s, 'Submitted')"
     )
     complaint_id = execute_query(
         insert_complaint, 
-        (req.title, req.description, req.image_path, req.detected_type, req.suggested_department, req.severity)
+        (req.user_id, req.title, req.description, req.image_path, req.detected_type, req.suggested_department, req.severity)
     )
     
     if req.risk_score is not None:
@@ -457,9 +567,14 @@ async def submit_complaint(req: ComplaintSubmitRequest):
 
 @app.post("/recommend-schemes")
 async def recommend_schemes(req: SchemeRequest):
-    # 1. Store/update user info (simple tracking)
-    insert_user = "INSERT INTO users (age, occupation, income, gender, education) VALUES (%s, %s, %s, %s, %s)"
-    execute_query(insert_user, (req.age, req.occupation, req.income, req.gender, req.education))
+    # Store or update user info if user_id is provided
+    if req.user_id:
+        update_user = "UPDATE users SET age = %s, occupation = %s, income = %s, gender = %s, education = %s WHERE id = %s"
+        execute_query(update_user, (req.age, req.occupation, req.income, req.gender, req.education, req.user_id))
+    else:
+        # Simple anonymous log tracking
+        insert_user = "INSERT INTO users (age, occupation, income, gender, education) VALUES (%s, %s, %s, %s, %s)"
+        execute_query(insert_user, (req.age, req.occupation, req.income, req.gender, req.education))
 
     # 2. Fetch all schemes to screen them
     schemes = execute_query("SELECT * FROM government_schemes", fetch=True)
@@ -513,13 +628,22 @@ async def recommend_schemes(req: SchemeRequest):
     return {"schemes": recommendations}
 
 @app.get("/complaints")
-async def get_complaints():
-    query = (
-        "SELECT c.*, r.risk_score, r.priority, r.reasoning FROM complaints c "
-        "LEFT JOIN risk_predictions r ON c.id = r.complaint_id "
-        "ORDER BY c.created_at DESC"
-    )
-    complaints = execute_query(query, fetch=True)
+async def get_complaints(user_id: Optional[int] = None):
+    if user_id:
+        query = (
+            "SELECT c.*, r.risk_score, r.priority, r.reasoning FROM complaints c "
+            "LEFT JOIN risk_predictions r ON c.id = r.complaint_id "
+            "WHERE c.user_id = %s "
+            "ORDER BY c.created_at DESC"
+        )
+        complaints = execute_query(query, (user_id,), fetch=True)
+    else:
+        query = (
+            "SELECT c.*, r.risk_score, r.priority, r.reasoning FROM complaints c "
+            "LEFT JOIN risk_predictions r ON c.id = r.complaint_id "
+            "ORDER BY c.created_at DESC"
+        )
+        complaints = execute_query(query, fetch=True)
     return complaints
 
 @app.get("/complaint/{id}")

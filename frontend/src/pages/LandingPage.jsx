@@ -1,15 +1,49 @@
-import React from 'react';
-import { Link } from 'react-router-dom';
-import { MessageSquare, AlertCircle, FileText, ArrowRight, Shield, Award, Sparkles } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { MessageSquare, AlertCircle, FileText, ArrowRight, Shield, Award, Sparkles, LogIn, CheckCircle } from 'lucide-react';
+import { GoogleLogin } from '@react-oauth/google';
+import { apiService } from '../services/api';
 
 export default function LandingPage() {
-  return (
-    <div className="min-h-screen bg-gradient-to-b from-gov-blue-50/50 via-white to-gov-blue-50/20">
-      {/* Header Banner - Tricolor accents */}
-      <div className="h-1.5 w-full bg-gradient-to-r from-gov-saffron-500 via-white to-gov-green-600"></div>
+  const [user, setUser] = useState(null);
+  const navigate = useNavigate();
 
+  useEffect(() => {
+    const savedUser = localStorage.getItem('bs_user_profile');
+    if (savedUser) {
+      try {
+        setUser(JSON.parse(savedUser));
+      } catch (e) {
+        localStorage.removeItem('bs_user_profile');
+      }
+    }
+  }, []);
+
+  const handleLoginSuccess = async (credentialResponse) => {
+    try {
+      const result = await apiService.googleAuth(credentialResponse.credential);
+      if (result?.user) {
+        setUser(result.user);
+        // Refresh page/trigger root state update to ensure header navbar is updated
+        window.location.reload();
+      }
+    } catch (e) {
+      console.error("Authentication failed:", e);
+      alert("Failed to authenticate with Google. Please try again.");
+    }
+  };
+
+  const handleRestrictedAction = (e, path) => {
+    if (!user) {
+      e.preventDefault();
+      alert("Access Restricted: Please sign in with Google to use this feature.");
+    }
+  };
+
+  return (
+    <div className="bg-gradient-to-b from-gov-blue-50/50 via-white to-gov-blue-50/20 min-h-[90vh]">
       {/* Main Hero Section */}
-      <div className="max-w-6xl mx-auto px-4 pt-16 pb-20 text-center">
+      <div className="max-w-6xl mx-auto px-4 pt-12 pb-20 text-center flex flex-col items-center">
         <div className="inline-flex items-center gap-2 bg-gov-blue-100/60 border border-gov-blue-200 text-gov-blue-800 px-4 py-1.5 rounded-full text-sm font-semibold mb-6 animate-pulse">
           <Sparkles className="h-4 w-4 text-gov-saffron-500" />
           Mera Bharat, Mera Saarthi (AI Powered Civic Assistant)
@@ -22,9 +56,33 @@ export default function LandingPage() {
           </span>
         </h1>
 
-        <p className="text-lg md:text-xl text-slate-600 max-w-3xl mx-auto mb-10 leading-relaxed">
+        <p className="text-lg md:text-xl text-slate-600 max-w-3xl mx-auto mb-8 leading-relaxed">
           Skip the complicated portals. Describe your issue in plain language, upload complaints with automated vision analysis, check risk severity with machine learning, and discover personalized government schemes.
         </p>
+
+        {/* Center Google Authentication on Landing Page when not logged in */}
+        {!user ? (
+          <div className="bg-white border border-slate-100 shadow-md p-6 rounded-2xl max-w-md w-full mb-10 flex flex-col items-center gap-4">
+            <div className="text-center">
+              <h3 className="font-bold text-slate-800 text-lg flex items-center gap-2 justify-center">
+                <LogIn className="w-5 h-5 text-gov-blue-700" /> Sign In to Get Started
+              </h3>
+              <p className="text-xs text-slate-500 mt-1">Sign in with Google to file official complaints, see your dashboard status, and view eligibility details.</p>
+            </div>
+            <GoogleLogin
+              onSuccess={handleLoginSuccess}
+              onError={() => console.log('Login Failed')}
+              shape="pill"
+              size="large"
+              text="signup_with"
+            />
+          </div>
+        ) : (
+          <div className="bg-green-50/50 border border-green-100 px-4 py-2.5 rounded-full mb-10 flex items-center gap-2">
+            <CheckCircle className="w-4 h-4 text-gov-green-600" />
+            <span className="text-xs font-semibold text-slate-700">Logged in as {user.name}. You have access to all features.</span>
+          </div>
+        )}
 
         {/* Quick Navigation Cards */}
         <div className="flex flex-wrap justify-center gap-4 mb-16">
@@ -33,11 +91,19 @@ export default function LandingPage() {
             Talk to Civic Companion
             <ArrowRight className="h-5 w-5" />
           </Link>
-          <Link to="/complaint-reporting" className="btn-saffron text-lg px-8 py-3.5">
+          <Link 
+            to="/complaint-reporting" 
+            onClick={(e) => handleRestrictedAction(e, "/complaint-reporting")}
+            className={`btn-saffron text-lg px-8 py-3.5 ${!user ? 'opacity-60 cursor-not-allowed shadow-none' : ''}`}
+          >
             <AlertCircle className="h-5 w-5" />
             Report Civic Complaint
           </Link>
-          <Link to="/schemes" className="btn-green text-lg px-8 py-3.5">
+          <Link 
+            to="/schemes" 
+            onClick={(e) => handleRestrictedAction(e, "/schemes")}
+            className={`btn-green text-lg px-8 py-3.5 ${!user ? 'opacity-60 cursor-not-allowed shadow-none' : ''}`}
+          >
             <FileText className="h-5 w-5" />
             Check Government Schemes
           </Link>

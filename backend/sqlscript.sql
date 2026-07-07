@@ -2,16 +2,21 @@
 
 CREATE TABLE IF NOT EXISTS users (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    age INT NOT NULL,
-    occupation VARCHAR(255) NOT NULL,
-    income DECIMAL(12, 2) NOT NULL,
-    gender VARCHAR(50) NOT NULL,
-    education VARCHAR(255) NOT NULL,
+    google_id VARCHAR(255) UNIQUE,
+    email VARCHAR(255) UNIQUE,
+    name VARCHAR(255),
+    picture VARCHAR(500),
+    age INT NULL,
+    occupation VARCHAR(255) NULL,
+    income DECIMAL(12, 2) NULL,
+    gender VARCHAR(50) NULL,
+    education VARCHAR(255) NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE IF NOT EXISTS complaints (
     id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NULL,
     title VARCHAR(255) NOT NULL,
     description TEXT NOT NULL,
     image_path VARCHAR(500),
@@ -19,16 +24,19 @@ CREATE TABLE IF NOT EXISTS complaints (
     suggested_department VARCHAR(100),
     severity VARCHAR(50),
     status VARCHAR(50) DEFAULT 'Submitted',
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
 );
 
 CREATE TABLE IF NOT EXISTS chat_history (
     id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NULL,
     session_id VARCHAR(255) NOT NULL,
     message TEXT NOT NULL,
     response TEXT NOT NULL,
     language VARCHAR(50) DEFAULT 'English',
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
 );
 
 CREATE TABLE IF NOT EXISTS government_schemes (

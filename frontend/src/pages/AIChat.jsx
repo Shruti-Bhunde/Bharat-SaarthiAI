@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { apiService } from '../services/api';
-import { Send, Languages, Sparkles, User, ArrowLeft, RefreshCw } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Send, Sparkles, User, RefreshCw } from 'lucide-react';
 import { getChatContent } from '../constants/chatLanguages';
 
 const createSessionId = () => 'session_' + Math.random().toString(36).substring(2, 15);
@@ -12,7 +11,7 @@ const createGreetingMessage = (language) => ({
   timestamp: new Date(),
 });
 
-export default function AIChat() {
+export default function AIChat({ globalLanguage }) {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [language, setLanguage] = useState('English');
@@ -31,7 +30,7 @@ export default function AIChat() {
 
   useEffect(() => {
     let existingSession = sessionStorage.getItem('bs_chat_session');
-    const savedLanguage = sessionStorage.getItem('bs_chat_language') || 'English';
+    const savedLanguage = globalLanguage || sessionStorage.getItem('bs_chat_language') || 'English';
 
     if (!existingSession) {
       existingSession = createSessionId();
@@ -43,17 +42,23 @@ export default function AIChat() {
     setMessages([createGreetingMessage(savedLanguage)]);
   }, []);
 
+  // Listen for language changes from the global header
+  useEffect(() => {
+    const handleGlobalLanguageChange = (e) => {
+      const nextLanguage = e.detail;
+      if (nextLanguage && nextLanguage !== language) {
+        const newSessionId = createSessionId();
+        setLanguage(nextLanguage);
+        resetConversation(nextLanguage, newSessionId);
+      }
+    };
+    window.addEventListener('languageChange', handleGlobalLanguageChange);
+    return () => window.removeEventListener('languageChange', handleGlobalLanguageChange);
+  }, [language, resetConversation]);
+
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
-
-  const handleLanguageChange = (nextLanguage) => {
-    if (nextLanguage === language) return;
-
-    const newSessionId = createSessionId();
-    setLanguage(nextLanguage);
-    resetConversation(nextLanguage, newSessionId);
-  };
 
   const handleSend = async (textToSend) => {
     const queryText = textToSend || input;
@@ -174,46 +179,18 @@ export default function AIChat() {
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col">
-      <div className="h-1.5 w-full bg-gradient-to-r from-gov-saffron-500 via-white to-gov-green-600"></div>
 
-      <header className="bg-white border-b border-slate-100 px-6 py-4 flex items-center justify-between shadow-sm">
-        <div className="flex items-center gap-3">
-          <Link to="/" className="text-slate-500 hover:text-gov-blue-800 transition-colors">
-            <ArrowLeft className="h-5 w-5" />
-          </Link>
-          <div className="flex items-center gap-2">
-            <span className="text-2xl">🇮🇳</span>
-            <div>
-              <h1 className="text-lg font-bold text-gov-blue-900 leading-tight">Bharat Saarthi AI</h1>
-              <p className="text-xs text-slate-500">Personal Civic Assistant</p>
-            </div>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2 bg-slate-100 px-3 py-1.5 rounded-xl text-sm font-medium text-slate-700">
-            <Languages className="h-4 w-4 text-gov-blue-700" />
-            <select
-              value={language}
-              onChange={(e) => handleLanguageChange(e.target.value)}
-              className="bg-transparent border-none outline-none cursor-pointer text-slate-700"
-            >
-              <option value="English">English</option>
-              <option value="Hindi">हिंदी (Hindi)</option>
-              <option value="Marathi">मराठी (Marathi)</option>
-            </select>
-          </div>
-
-          <button
-            onClick={startNewChat}
-            className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-gov-saffron-600 border border-slate-200 hover:border-gov-saffron-500 bg-white px-2.5 py-1.5 rounded-lg transition-all"
-            title="Start New Session"
-          >
-            <RefreshCw className="h-3 w-3" />
-            Reset Chat
-          </button>
-        </div>
-      </header>
+      {/* Reset Chat button row */}
+      <div className="bg-white border-b border-slate-100 px-6 py-2 flex justify-end">
+        <button
+          onClick={startNewChat}
+          className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-gov-saffron-600 border border-slate-200 hover:border-gov-saffron-500 bg-white px-2.5 py-1.5 rounded-lg transition-all"
+          title="Start New Session"
+        >
+          <RefreshCw className="h-3 w-3" />
+          Reset Chat
+        </button>
+      </div>
 
       <main className="flex-1 max-w-4xl w-full mx-auto p-4 md:p-6 flex flex-col justify-between overflow-hidden">
         <div className="flex-1 overflow-y-auto pr-2 space-y-4 mb-4">

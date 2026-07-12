@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { apiService } from '../services/api';
-import { Upload, AlertCircle, Cpu, Save, FileImage, ShieldAlert, ArrowLeft, RefreshCw } from 'lucide-react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Upload, AlertCircle, Cpu, Save, FileImage, ShieldAlert, RefreshCw } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 export default function ComplaintReporting() {
   const navigate = useNavigate();
@@ -140,20 +140,6 @@ export default function ComplaintReporting() {
 
   return (
     <div className="min-h-screen bg-slate-50">
-      {/* Header Banner - Tricolor accents */}
-      <div className="h-1.5 w-full bg-gradient-to-r from-gov-saffron-500 via-white to-gov-green-600"></div>
-
-      {/* Top Navbar */}
-      <header className="bg-white border-b border-slate-100 px-6 py-4 flex items-center gap-3 shadow-sm">
-        <Link to="/" className="text-slate-500 hover:text-gov-blue-800 transition-colors">
-          <ArrowLeft className="h-5 w-5" />
-        </Link>
-        <span className="text-2xl">🇮🇳</span>
-        <div>
-          <h1 className="text-lg font-bold text-gov-blue-900 leading-tight">Smart Complaint Portal</h1>
-          <p className="text-xs text-slate-500">FastAPI, Gemini Vision, & Random Forest Integration</p>
-        </div>
-      </header>
 
       <main className="max-w-5xl mx-auto p-4 md:p-8 grid md:grid-cols-2 gap-8">
         {/* Left Column: Image Upload & Detail Inputs */}

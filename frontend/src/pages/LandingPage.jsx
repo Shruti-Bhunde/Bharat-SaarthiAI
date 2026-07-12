@@ -1,42 +1,15 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { MessageSquare, AlertCircle, FileText, ArrowRight, Shield, Award, Sparkles, LogIn, CheckCircle } from 'lucide-react';
 import { GoogleLogin } from '@react-oauth/google';
-import { apiService } from '../services/api';
 
-export default function LandingPage() {
-  const [user, setUser] = useState(null);
+export default function LandingPage({ user, onLoginSuccess }) {
   const navigate = useNavigate();
 
-  useEffect(() => {
-    const savedUser = localStorage.getItem('bs_user_profile');
-    if (savedUser) {
-      try {
-        setUser(JSON.parse(savedUser));
-      } catch (e) {
-        localStorage.removeItem('bs_user_profile');
-      }
-    }
-  }, []);
-
-  const handleLoginSuccess = async (credentialResponse) => {
-    try {
-      const result = await apiService.googleAuth(credentialResponse.credential);
-      if (result?.user) {
-        setUser(result.user);
-        // Refresh page/trigger root state update to ensure header navbar is updated
-        window.location.reload();
-      }
-    } catch (e) {
-      console.error("Authentication failed:", e);
-      alert("Failed to authenticate with Google. Please try again.");
-    }
-  };
-
-  const handleRestrictedAction = (e, path) => {
+  const handleRestrictedAction = (e) => {
     if (!user) {
       e.preventDefault();
-      alert("Access Restricted: Please sign in with Google to use this feature.");
+      alert('Access Restricted: Please sign in with Google to use this feature.');
     }
   };
 
@@ -70,7 +43,7 @@ export default function LandingPage() {
               <p className="text-xs text-slate-500 mt-1">Sign in with Google to file official complaints, see your dashboard status, and view eligibility details.</p>
             </div>
             <GoogleLogin
-              onSuccess={handleLoginSuccess}
+              onSuccess={onLoginSuccess}
               onError={() => console.log('Login Failed')}
               shape="pill"
               size="large"
@@ -84,30 +57,24 @@ export default function LandingPage() {
           </div>
         )}
 
-        {/* Quick Navigation Cards */}
-        <div className="flex flex-wrap justify-center gap-4 mb-16">
-          <Link to="/chat" className="btn-primary text-lg px-8 py-3.5">
-            <MessageSquare className="h-5 w-5" />
-            Talk to Civic Companion
-            <ArrowRight className="h-5 w-5" />
-          </Link>
-          <Link 
-            to="/complaint-reporting" 
-            onClick={(e) => handleRestrictedAction(e, "/complaint-reporting")}
-            className={`btn-saffron text-lg px-8 py-3.5 ${!user ? 'opacity-60 cursor-not-allowed shadow-none' : ''}`}
-          >
-            <AlertCircle className="h-5 w-5" />
-            Report Civic Complaint
-          </Link>
-          <Link 
-            to="/schemes" 
-            onClick={(e) => handleRestrictedAction(e, "/schemes")}
-            className={`btn-green text-lg px-8 py-3.5 ${!user ? 'opacity-60 cursor-not-allowed shadow-none' : ''}`}
-          >
-            <FileText className="h-5 w-5" />
-            Check Government Schemes
-          </Link>
-        </div>
+        {/* Quick Navigation Cards — only when logged in */}
+        {user && (
+          <div className="flex flex-wrap justify-center gap-4 mb-16">
+            <Link to="/chat" className="btn-primary text-lg px-8 py-3.5">
+              <MessageSquare className="h-5 w-5" />
+              Talk to Civic Companion
+              <ArrowRight className="h-5 w-5" />
+            </Link>
+            <Link to="/complaint-reporting" className="btn-saffron text-lg px-8 py-3.5">
+              <AlertCircle className="h-5 w-5" />
+              Report Civic Complaint
+            </Link>
+            <Link to="/schemes" className="btn-green text-lg px-8 py-3.5">
+              <FileText className="h-5 w-5" />
+              Check Government Schemes
+            </Link>
+          </div>
+        )}
 
         {/* Informative Grid of Features */}
         <div className="grid md:grid-cols-3 gap-8 mt-10">

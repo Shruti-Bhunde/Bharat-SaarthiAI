@@ -3,6 +3,7 @@ import pickle
 import uuid
 import shutil
 import json
+import re
 from typing import Optional
 from fastapi import FastAPI, File, UploadFile, Form, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -12,7 +13,7 @@ from PIL import Image
 import numpy as np
 
 # Import database utils
-from backend.database import init_db, execute_query
+from database import init_db, execute_query
 init_db()
 
 # Configure Gemini
@@ -330,6 +331,58 @@ async def chat(req: ChatRequest):
     system_instructions = build_chat_prompt(req.language, req.message, history_context)
 
     ai_response = get_gemini_response(system_instructions, language=req.language)
+
+    # Log raw AI response for debugging (trim to avoid huge logs)
+    try:
+        _debug_log("main.py:chat", "Raw AI response", {"raw_preview": ai_response[:2000]}, "D1")
+    except Exception:
+        pass
+
+    # For Hindi/Marathi, also store the full raw response so we can inspect
+    # any special characters or markup that may break frontend rendering.
+    try:
+        if req.language in ("Hindi", "Marathi"):
+            _debug_log(
+                "main.py:chat",
+                "Raw AI response full (for Devanagari languages)",
+                {"raw_full_len": len(ai_response), "raw_full": ai_response},
+                "D1-full",
+            )
+    except Exception:
+        pass
+
+    # Post-process AI response to remove stray numeric-only lines that can
+    # appear as isolated digits (e.g., a trailing "1" on its own) which
+    # cause the frontend to render odd lone numbers or make the reply look
+    # truncated. This keeps intended numbered lists but drops lines that are
+    # only a number or number+dot.
+    try:
+        raw = ai_response
+        lines = raw.splitlines()
+        cleaned = []
+        for line in lines:
+            stripped = line.strip()
+            # drop lines that are just digits like "1", "2." or Devanagari numerals like "१" or "१." etc.
+            # Accept optional trailing punctuation: dot, parenthesis, colon, danda (।) or double danda (॥).
+            if re.fullmatch(r"[\d\u0966-\u096F]+[.\)\]\:\-\u0964\u0965]?", stripped):
+                continue
+            cleaned.append(line)
+        cleaned_response = "\n".join(cleaned).strip()
+        if cleaned_response:
+            ai_response = cleaned_response
+        # Log whether cleaning changed content
+        try:
+            _debug_log(
+                "main.py:chat",
+                "Cleaned AI response",
+                {"changed": raw != ai_response, "cleaned_preview": ai_response[:2000]},
+                "D2",
+            )
+        except Exception:
+            pass
+    except Exception:
+        # don't fail the whole request on cleanup errors
+        pass
 
     # #region agent log
     _debug_log(

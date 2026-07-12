@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { apiService } from '../services/api';
-import { FileText, Eye, CheckCircle2, ShieldAlert, Clock, Info, ArrowLeft, RefreshCw, X, Filter } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { FileText, Eye, CheckCircle2, ShieldAlert, Clock, Info, RefreshCw, X, Filter } from 'lucide-react';
+
 
 export default function ComplaintDashboard() {
   const [complaints, setComplaints] = useState([]);
@@ -77,31 +77,6 @@ export default function ComplaintDashboard() {
 
   return (
     <div className="min-h-screen bg-slate-50">
-      {/* Header Banner - Tricolor accents */}
-      <div className="h-1.5 w-full bg-gradient-to-r from-gov-saffron-500 via-white to-gov-green-600"></div>
-
-      {/* Top Navbar */}
-      <header className="bg-white border-b border-slate-100 px-6 py-4 flex items-center justify-between shadow-sm">
-        <div className="flex items-center gap-3">
-          <Link to="/" className="text-slate-500 hover:text-gov-blue-800 transition-colors">
-            <ArrowLeft className="h-5 w-5" />
-          </Link>
-          <span className="text-2xl">🇮🇳</span>
-          <div>
-            <h1 className="text-lg font-bold text-gov-blue-900 leading-tight">Civic Dashboard</h1>
-            <p className="text-xs text-slate-500">Complaint tracking & localized priorities</p>
-          </div>
-        </div>
-
-        <button 
-          onClick={fetchComplaints}
-          disabled={loading}
-          className="p-2 border border-slate-200 bg-white rounded-xl hover:bg-slate-50 text-slate-600 transition-colors"
-          title="Refresh Dashboard"
-        >
-          <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-        </button>
-      </header>
 
       <main className="max-w-6xl mx-auto p-4 md:p-8 space-y-6">
         
